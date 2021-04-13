@@ -60,9 +60,12 @@ const checkVinNumberUnique = async (req, res, next) => {
     // `{ message: "vin <vin number> already exists" }` if the vin number 
     // already exists in the database.
     const { vin } = req.body
+    const { id } = req.params
     try {
         const cars = await Cars.getAll()
-        const matches = cars.filter(car => car.vin === vin).length
+        const matches = cars.filter(car => {
+            return car.vin === vin && car.id != id // Needs to be car.id != id for some reason
+        }).length
         if (matches) {
             res.status(400).json({ message: `vin ${vin} already exists` })
         }
