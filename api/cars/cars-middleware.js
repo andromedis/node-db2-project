@@ -2,9 +2,6 @@ const Cars = require('./cars-model')
 const vinValidator = require('vin-validator')
 
 const checkCarId = async (req, res, next) => {
-    // `checkCarId` returns a status 404 with a 
-    // `{ message: "car with id <car id> is not found" }` if the id in 
-    // `req.params` does not exist in the database.
     const { id } = req.params
     try {
         const car = await Cars.getById(id)
@@ -23,29 +20,52 @@ const checkCarId = async (req, res, next) => {
 }
 
 const checkCarPayload = (req, res, next) => {
-    // `checkCarPayload` returns a status 400 with a 
-    // `{ message: "<field name> is missing" }` if any required field is missing.
-    const { vin, make, model, mileage } = req.body
-    if (!vin) {
-        res.status(400).json({ message: 'vin is missing' })
+    const required = ['vin', 'make', 'model', 'mileage']
+
+    // Removes any id property from payload
+    if (req.body.id) {
+        const { id, ...rest } = req.body
+        req.body = rest
     }
-    else if (!make) {
-        res.status(400).json({ message: 'make is missing' })
-    }
-    else if (!model) {
-        res.status(400).json({ message: 'model is missing' })
-    }
-    else if (!mileage) {
-        res.status(400).json({ message: 'mileage is missing' })
-    }
-    else {
+
+    // Checks that required properties exist
+    required.forEach(item => {
+        if (!req.body[item])
+            res.status(400).json({ message: `${item} is missing` })
+    })
+
+    // Checks that required properties have proper types, trims strings
+    required.forEach(item => {
+        switch (item) {
+            case 'mileage':
+                if (typeof req.body[item] !== 'number')
+                    res.status(400).json({ message: `${item} must be a number` })
+                break;
+            default:
+                if (typeof req.body[item] !== 'string')
+                    res.status(400).json({ message: `${item} must be a string` })
+                else
+                    req.body[item] = req.body[item].trim()
+        }
+    })
+
+    // Checks that optional properties are strings, trims them
+    Object.keys(req.body)
+        .filter(item => !required.includes(item))
+        .forEach(item => {
+            if (req.body[item] && typeof req.body[item] !== 'string')
+                res.status(400).json({ message: `${item} must be a string` })
+            else
+                req.body[item] = req.body[item].trim()
+    })
+
+    // Sends to next
+    if (!res.headersSent) {
         next()
     }
 }
 
 const checkVinNumberValid = (req, res, next) => {
-    // `checkVinNumberValid` returns a status 400 with a 
-    // `{ message: "vin <vin number> is invalid" }` if the vin number is invalid
     const { vin } = req.body
     if (vinValidator.validate(vin)) {
         next()
@@ -56,15 +76,13 @@ const checkVinNumberValid = (req, res, next) => {
 }
 
 const checkVinNumberUnique = async (req, res, next) => {
-    // `checkVinNumberUnique` returns a status 400 with a 
-    // `{ message: "vin <vin number> already exists" }` if the vin number 
-    // already exists in the database.
     const { vin } = req.body
     const { id } = req.params
     try {
         const cars = await Cars.getAll()
         const matches = cars.filter(car => {
-            return car.vin === vin && car.id != id // Needs to be car.id != id for some reason
+            return car.vin === vin && car.id != id 
+            // Needs to be car.id != id for some reason -- !== won't work
         }).length
         if (matches) {
             res.status(400).json({ message: `vin ${vin} already exists` })

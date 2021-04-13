@@ -62,7 +62,9 @@ router.delete('/:id', mw.checkCarId, async (req, res, next) => {
 
 // Handle error response
 router.use((err, req, res, next) => {
-    res.status(500).json({ message: err.message, stack: err.stack })
+    if (!res.headersSent) { // For some reason sends repeating headers without this
+        res.status(500).json({ message: err.message, stack: err.stack })
+    }
 })
 
 
